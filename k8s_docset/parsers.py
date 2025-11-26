@@ -337,12 +337,16 @@ class DashAnchorParser:
     Dash's built-in docset generator embeds anchors like:
     <a name="//apple_ref/Entry/PodSpec" class="dashAnchor"></a>
 
+    Our TOC injector also creates anchors like:
+    <a name="//apple_ref/cpp/Section/Name" class="dashAnchor"></a>
+
     These contain high-quality, granular entries for API types, fields, etc.
     """
 
     # Pattern to extract type and name from apple_ref format
-    # Format: //apple_ref/TYPE/NAME
-    ANCHOR_PATTERN = re.compile(r"//apple_ref/(\w+)/(.+)")
+    # Dash format: //apple_ref/TYPE/NAME
+    # Our format: //apple_ref/cpp/TYPE/NAME (cpp is language indicator)
+    ANCHOR_PATTERN = re.compile(r"//apple_ref/(?:cpp/)?(\w+)/(.+)")
 
     # Map Dash's apple_ref types to our preferred types
     TYPE_MAP = {
@@ -353,6 +357,32 @@ class DashAnchorParser:
         "Sample": "Sample",
         "Command": "Command",
     }
+
+    # Generic/noisy entries to skip (lowercase for comparison)
+    SKIP_NAMES = {
+        "feedback",
+        "before you begin",
+        "what's next",
+        "what-s-next",
+        "see also",
+        "options",
+        "synopsis",
+        "examples",
+        "parent options inherited",
+        "operations",
+        "metadata",
+        "items",
+        "spec",
+        "status",
+        "clean up",
+        "objectives",
+        "resource types",
+    }
+
+    # Patterns that indicate noisy entries
+    SKIP_PATTERNS = [
+        r"^.+ - Note:$",  # "Pod - Note:", "ConfigMap - Note:"
+    ]
 
     def matches(self, relative_path: str) -> bool:
         """Match any HTML file that might contain dashAnchors."""
@@ -377,6 +407,19 @@ class DashAnchorParser:
                 from urllib.parse import unquote
                 entry_name = unquote(entry_name)
 
+                # Skip generic/noisy entries
+                if entry_name.lower() in self.SKIP_NAMES:
+                    continue
+
+                # Skip entries matching noise patterns
+                skip = False
+                for pattern in self.SKIP_PATTERNS:
+                    if re.match(pattern, entry_name):
+                        skip = True
+                        break
+                if skip:
+                    continue
+
                 # Map to our preferred type
                 mapped_type = self.TYPE_MAP.get(entry_type, entry_type)
 
@@ -391,6 +434,10 @@ class DashAnchorParser:
                 path = relative_path
                 if anchor_id:
                     path = f"{relative_path}#{anchor_id}"
+
+                # Truncate very long names
+                if len(entry_name) > 80:
+                    entry_name = entry_name[:77] + "..."
 
                 yield IndexEntry(
                     name=entry_name,
