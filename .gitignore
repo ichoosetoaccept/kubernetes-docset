@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv
 
-# Generated docsets (large files)
+# Generated docsets and cached data (large files)
 output/
 *.docset
+.cache/

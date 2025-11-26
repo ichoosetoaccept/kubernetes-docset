@@ -424,11 +424,20 @@ class FallbackParser:
             )
 
 
+# Import enhanced parsers
+try:
+    from .enhanced_parsers import ENHANCED_PARSERS
+except ImportError:
+    ENHANCED_PARSERS = []
+
+
 # All parsers in order of specificity
-# DashAnchorParser runs on ALL files to extract granular entries
+# DashAnchorParser runs on ALL files to extract granular entries (if they exist)
+# Enhanced parsers extract the same information from raw HTML structure
 # Then specific parsers add their own entries
 ALL_PARSERS = [
-    DashAnchorParser(),  # Extract embedded anchors first (highest value)
+    DashAnchorParser(),  # Extract embedded anchors first (if present from Dash)
+    *ENHANCED_PARSERS,   # Enhanced parsers for raw HTML extraction
     APIResourceParser(),
     KubectlCommandParser(),
     ComponentParser(),
