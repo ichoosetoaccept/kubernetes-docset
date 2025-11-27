@@ -1,6 +1,6 @@
 # Kubernetes Docset Generator for Dash
 
-A Python tool to generate high-quality Dash docsets for Kubernetes v1.34 documentation with enhanced semantic indexing.
+A Python tool to generate high-quality [Dash](https://kapeli.com/dash) docsets for Kubernetes documentation with enhanced semantic indexing.
 
 ## Features
 
@@ -35,11 +35,8 @@ A Python tool to generate high-quality Dash docsets for Kubernetes v1.34 documen
 ## Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd kubernetes-1.34-docs
-
-# Dependencies are managed by uv automatically
+git clone https://github.com/ichoosetoaccept/kubernetes-docset.git
+cd kubernetes-docset
 ```
 
 ## Usage
@@ -122,10 +119,13 @@ All matching parsers run on each file, allowing multiple entry types per page. F
 │   ├── parsers.py               # Core HTML parsers
 │   ├── enhanced_parsers.py      # Enhanced parsers for raw HTML
 │   └── scraper.py               # Web scraper for kubernetes.io
-├── pyproject.toml               # Project dependencies
-└── README.md                    # This file
+├── contrib/                     # Dash contribution files
+│   ├── docset.json
+│   ├── icon.png
+│   └── icon@2x.png
+└── pyproject.toml               # Project dependencies
 ```
 
 ## License
 
-MIT License
+MIT License - see [LICENSE](LICENSE) for details.
