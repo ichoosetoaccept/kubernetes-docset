@@ -1,0 +1,10 @@
+{
+    "name": "Kubernetes",
+    "version": "1.34",
+    "archive": "Kubernetes.tgz",
+    "author": {
+        "name": "Ismar Iljazovic",
+        "link": "https://github.com/ichoosetoaccept"
+    },
+    "aliases": ["k8s", "kube", "kubectl", "kubernetes"]
+}
