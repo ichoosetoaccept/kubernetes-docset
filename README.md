@@ -4,20 +4,22 @@ A Python tool to generate high-quality [Dash](https://kapeli.com/dash) docsets f
 
 ## Features
 
-- **Enhanced Indexing**: Extracts 15,600+ searchable entries including:
-  - 5,195 API Types (PodSpec, DeploymentStatus, Container, etc.)
-  - 4,379 Sections (Volumes, Scheduling, Security Context, etc.)
-  - 2,169 Code Samples
-  - 910 Properties (field definitions)
-  - 819 Guides (concepts, tasks, tutorials)
-  - 244 Glossary terms
-  - 163 API Resources
-  - 90 kubectl Commands
-  - 6 Components
+- **Enhanced Indexing**: Extracts ~8,000+ searchable entries including:
+  - API Types (PodSpec, DeploymentStatus, Container, etc.)
+  - Sections (Volumes, Scheduling, Security Context, etc.)
+  - Guides (concepts, tasks, tutorials)
+  - Glossary terms
+  - API Resources
+  - kubectl Commands
+  - Components
+
+- **Sitemap-Based Scraping**: Uses kubernetes.io/en/sitemap.xml to download ~900 valid doc pages with zero 404 errors
 
 - **Multiple Input Sources**:
-  - Scrape directly from kubernetes.io (--scrape)
-  - Use existing Dash-generated docset (--source)
+  - Scrape directly from kubernetes.io (`--scrape`)
+  - Use existing Dash-generated docset (`--source`)
+
+- **Validation**: Built-in docset validation script and pre-commit hooks
 
 - **Intelligent Parsing**: Specialized parsers for different documentation types:
   - API reference pages
@@ -48,9 +50,10 @@ uv run python main.py --scrape
 ```
 
 This will:
-1. Download all Kubernetes documentation from kubernetes.io
-2. Cache it in `.cache/kubernetes-docs/`
-3. Generate a Dash docset in `./output/`
+1. Fetch sitemap and download ~900 documentation pages from kubernetes.io
+2. Download CSS, JS, and image assets
+3. Cache everything in `.cache/kubernetes-docs/`
+4. Generate a Dash docset in `./output/` with relative asset paths
 
 ### Option 2: Use Existing Dash-Generated Source
 
@@ -108,21 +111,33 @@ All matching parsers run on each file, allowing multiple entry types per page. F
 - Multiple Type entries for embedded types (PodSpec, Container, etc.)
 - Multiple Section entries for field groups
 
+## Validation
+
+```bash
+# Validate the generated docset
+uv run python verify.py -v
+
+# Run pre-commit validation hook
+prek run --hook-stage manual validate-docset
+```
+
 ## Project Structure
 
 ```
 .
 ├── main.py                      # CLI entry point
+├── verify.py                    # Docset validation script
 ├── k8s_docset/
 │   ├── __init__.py
-│   ├── builder.py               # Docset builder
+│   ├── builder.py               # Docset builder (path fixing, TOC injection)
 │   ├── parsers.py               # Core HTML parsers
 │   ├── enhanced_parsers.py      # Enhanced parsers for raw HTML
-│   └── scraper.py               # Web scraper for kubernetes.io
+│   └── scraper.py               # Sitemap-based web scraper
 ├── contrib/                     # Dash contribution files
 │   ├── docset.json
 │   ├── icon.png
 │   └── icon@2x.png
+├── .pre-commit-config.yaml      # Pre-commit hooks (ruff, validation)
 └── pyproject.toml               # Project dependencies
 ```
 
