@@ -163,21 +163,21 @@ class KubernetesDocScraper:
         """
         # CSS files
         for link in soup.find_all("link", rel="stylesheet"):
-            if link.get("href"):
-                self._download_asset(link["href"], page_url)
+            if href := link.get("href"):
+                self._download_asset(str(href), page_url)
 
         # JavaScript files
         for script in soup.find_all("script", src=True):
-            self._download_asset(script["src"], page_url)
+            self._download_asset(str(script["src"]), page_url)
 
         # Images
         for img in soup.find_all("img", src=True):
-            self._download_asset(img["src"], page_url)
+            self._download_asset(str(img["src"]), page_url)
 
         # Favicons and other icons
         for link in soup.find_all("link", rel=["icon", "apple-touch-icon"]):
-            if link.get("href"):
-                self._download_asset(link["href"], page_url)
+            if href := link.get("href"):
+                self._download_asset(str(href), page_url)
 
     def _download_asset(self, asset_url: str, page_url: str) -> None:
         """Download a static asset.

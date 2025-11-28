@@ -53,7 +53,7 @@ class EnhancedAPIReferenceParser:
         # Extract Type entries from H2 headings
         for h2 in soup.find_all("h2", id=True):
             type_name = h2.get("id")
-            if type_name and type_name not in [
+            if type_name and isinstance(type_name, str) and type_name not in [
                 "Pod",
                 "Write",
                 "Read",

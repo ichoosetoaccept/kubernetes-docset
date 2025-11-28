@@ -398,6 +398,8 @@ class DashAnchorParser:
         # Find all dashAnchor elements
         for anchor in soup.find_all("a", class_="dashAnchor"):
             name_attr = anchor.get("name", "")
+            if not isinstance(name_attr, str):
+                continue
             match = self.ANCHOR_PATTERN.match(name_attr)
 
             if match:
