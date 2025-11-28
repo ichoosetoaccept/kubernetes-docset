@@ -1,21 +1,27 @@
-#!/usr/bin/env python3
 """Validate a Kubernetes Dash docset for correctness and completeness.
 
 This script performs comprehensive validation of a generated docset,
 checking structure, assets, paths, and search index integrity.
 """
 
+# ruff: noqa: T201, PLR0912, C901
+
 import argparse
+import random
 import re
 import sqlite3
 import sys
 from pathlib import Path
 
+# Minimum expected entries in search index
+MIN_EXPECTED_ENTRIES = 1000
+
 
 class DocsetValidator:
     """Validates a Dash docset for correctness."""
 
-    def __init__(self, docset_path: Path, verbose: bool = False):
+    def __init__(self, docset_path: Path, *, verbose: bool = False) -> None:
+        """Initialize validator with docset path."""
         self.docset_path = docset_path
         self.verbose = verbose
         self.errors: list[str] = []
@@ -59,20 +65,19 @@ class DocsetValidator:
 
         print("=" * 60)
         if self.errors:
-            print(
-                f"\n❌ FAILED: {len(self.errors)} error(s), {len(self.warnings)} warning(s)"
-            )
+            err_count = len(self.errors)
+            warn_count = len(self.warnings)
+            print(f"\n❌ FAILED: {err_count} error(s), {warn_count} warning(s)")
             for err in self.errors:
                 print(f"  - {err}")
             return False
-        elif self.warnings:
+        if self.warnings:
             print(f"\n⚠️  PASSED with {len(self.warnings)} warning(s)")
             for warn in self.warnings:
                 print(f"  - {warn}")
             return True
-        else:
-            print("\n✅ PASSED: All checks passed!")
-            return True
+        print("\n✅ PASSED: All checks passed!")
+        return True
 
     def _check_structure(self) -> None:
         """Check basic docset directory structure."""
@@ -82,7 +87,7 @@ class DocsetValidator:
             self.error(f"Docset not found: {self.docset_path}")
             return
 
-        if not self.docset_path.suffix == ".docset":
+        if self.docset_path.suffix != ".docset":
             self.error("Path must end with .docset")
 
         required_dirs = [
@@ -123,7 +128,8 @@ class DocsetValidator:
 
         # Check dashIndexFilePath points to existing file
         match = re.search(
-            r"<key>dashIndexFilePath</key>\s*<string>([^<]+)</string>", content
+            r"<key>dashIndexFilePath</key>\s*<string>([^<]+)</string>",
+            content,
         )
         if match:
             index_path = self.documents_dir / match.group(1)
@@ -163,7 +169,8 @@ class DocsetValidator:
 
             # Check table exists
             cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='searchIndex'"
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name='searchIndex'",
             )
             if not cursor.fetchone():
                 self.error("searchIndex table not found")
@@ -177,7 +184,7 @@ class DocsetValidator:
             count = cursor.fetchone()[0]
             if count == 0:
                 self.error("searchIndex is empty")
-            elif count < 1000:
+            elif count < MIN_EXPECTED_ENTRIES:
                 self.warning(f"searchIndex has only {count} entries (expected 10000+)")
             else:
                 self.success(f"searchIndex has {count} entries")
@@ -205,7 +212,7 @@ class DocsetValidator:
 
             if missing_count > 0:
                 self.warning(
-                    f"{missing_count}/10 sampled index paths point to missing files"
+                    f"{missing_count}/10 sampled index paths point to missing files",
                 )
             else:
                 self.success("Sampled index paths all exist")
@@ -247,12 +254,10 @@ class DocsetValidator:
 
         # Sample some HTML files to check for absolute paths
         sample_size = min(20, len(html_files))
-        import random
-
         sample_files = random.sample(html_files, sample_size)
 
         absolute_path_pattern = re.compile(
-            r'(href|src)=["\']?/(scss|css|js|fonts|icons|images)/'
+            r'(href|src)=["\']?/(scss|css|js|fonts|icons|images)/',
         )
         files_with_absolute = 0
 
@@ -264,13 +269,14 @@ class DocsetValidator:
                     if self.verbose:
                         rel_path = html_file.relative_to(self.documents_dir)
                         self.warning(f"Absolute asset path in: {rel_path}")
-            except Exception:
+            except OSError:
                 pass
 
         if files_with_absolute > 0:
-            self.error(
-                f"{files_with_absolute}/{sample_size} sampled HTML files have absolute asset paths"
+            msg = (
+                f"{files_with_absolute}/{sample_size} sampled files have absolute paths"
             )
+            self.error(msg)
         else:
             self.success("No absolute asset paths found in sampled HTML files")
 
@@ -288,11 +294,12 @@ class DocsetValidator:
                     if re.search(pattern, content):
                         self.warning(f"{desc} found")
                         break
-                except Exception:
+                except OSError:
                     pass
 
 
 def main() -> int:
+    """CLI entry point."""
     parser = argparse.ArgumentParser(description="Validate a Dash docset")
     parser.add_argument(
         "docset",
