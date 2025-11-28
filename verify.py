@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Validate a Kubernetes Dash docset for correctness and completeness.
 
 This script performs comprehensive validation of a generated docset,
