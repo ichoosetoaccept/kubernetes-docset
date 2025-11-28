@@ -138,6 +138,10 @@ class DocsetBuilder:
         """Copy an HTML file, injecting dashAnchor elements for TOC support."""
         try:
             content = source_file.read_text(encoding="utf-8", errors="replace")
+
+            # Fix absolute paths to be relative before parsing
+            content = self._fix_absolute_paths(content, dest_file)
+
             soup = BeautifulSoup(content, "lxml")
 
             # Find all headings with IDs (h1, h2, h3)
@@ -179,6 +183,79 @@ class DocsetBuilder:
         except Exception:
             # If processing fails, just copy the file as-is
             shutil.copy2(source_file, dest_file)
+
+    def _fix_absolute_paths(self, content: str, dest_file: Path) -> str:
+        """Convert absolute paths to relative paths in HTML content.
+
+        Args:
+            content: HTML content to fix
+            dest_file: Destination file path (used to calculate relative paths)
+
+        Returns:
+            HTML content with fixed paths
+        """
+        # Calculate depth from documents root to this file
+        try:
+            relative_to_docs = dest_file.relative_to(self.documents_dir)
+            depth = len(relative_to_docs.parts) - 1  # -1 for the file itself
+        except ValueError:
+            depth = 0
+
+        prefix = "../" * depth
+
+        # Asset directories that should have paths fixed
+        asset_dirs = ["scss", "css", "js", "fonts", "icons", "images"]
+
+        # Fix absolute paths for each asset directory
+        for asset_dir in asset_dirs:
+            # Match href="/asset_dir/..." and src="/asset_dir/..."
+            # Handle quoted attributes
+            content = re.sub(
+                rf'(href|src)="/{asset_dir}/([^"]*)"',
+                rf'\1="{prefix}{asset_dir}/\2"',
+                content,
+            )
+            content = re.sub(
+                rf"(href|src)='/{asset_dir}/([^']*)'",
+                rf"\1='{prefix}{asset_dir}/\2'",
+                content,
+            )
+            # Handle unquoted attributes (minified HTML)
+            content = re.sub(
+                rf"(href|src)=/{asset_dir}/(\S+?)([>\s])",
+                rf"\1={prefix}{asset_dir}/\2\3",
+                content,
+            )
+
+        # Also fix external jQuery to use local copy if we have it
+        # Handle quoted attributes
+        content = re.sub(
+            r'src="https://code\.jquery\.com/jquery-[\d.]+\.min\.js"',
+            f'src="{prefix}js/jquery-3.6.0.min.js"',
+            content,
+        )
+        # Handle unquoted attributes (minified HTML)
+        content = re.sub(
+            r"src=https://code\.jquery\.com/jquery-[\d.]+\.min\.js([>\s])",
+            rf"src={prefix}js/jquery-3.6.0.min.js\1",
+            content,
+        )
+
+        # Remove Google Analytics/Tag Manager scripts (they won't work offline)
+        content = re.sub(
+            r"<script[^>]*googletagmanager[^>]*>.*?</script>",
+            "",
+            content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+        content = re.sub(
+            r"<script[^>]*google-analytics[^>]*>.*?</script>",
+            "",
+            content,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+
+        return content
 
     def _copy_icon(self) -> None:
         """Copy or create the docset icon."""
@@ -249,7 +326,7 @@ class DocsetBuilder:
             identifier="kubernetes",
             name=self.docset_name,
             family="kubernetes",
-            index_path="kubernetes.io/docs/home/index.html",
+            index_path="docs/home/index.html",
             keyword="k8s",
             fallback_url="https://kubernetes.io/docs/",
         )

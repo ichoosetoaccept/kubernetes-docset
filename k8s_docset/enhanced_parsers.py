@@ -8,7 +8,6 @@ import re
 from pathlib import Path
 from typing import Iterator
 
-from bs4 import BeautifulSoup, Tag
 
 from .parsers import IndexEntry, parse_html_file
 
@@ -27,9 +26,7 @@ class EnhancedAPIReferenceParser:
     )
 
     # Pattern to match field definitions: <strong>fieldName</strong> (TypeName)
-    FIELD_PATTERN = re.compile(
-        r"^([a-zA-Z0-9_\.]+)\s*\((.*?)\)(?:,\s*required)?$"
-    )
+    FIELD_PATTERN = re.compile(r"^([a-zA-Z0-9_\.]+)\s*\((.*?)\)(?:,\s*required)?$")
 
     def matches(self, relative_path: str) -> bool:
         """Check if this parser should handle the given path."""
@@ -56,7 +53,15 @@ class EnhancedAPIReferenceParser:
         # Extract Type entries from H2 headings
         for h2 in soup.find_all("h2", id=True):
             type_name = h2.get("id")
-            if type_name and type_name not in ["Pod", "Write", "Read", "Delete", "List", "Status", "Misc"]:
+            if type_name and type_name not in [
+                "Pod",
+                "Write",
+                "Read",
+                "Delete",
+                "List",
+                "Status",
+                "Misc",
+            ]:
                 # These are type definitions like PodSpec, PodStatus, Container, etc.
                 if not type_name.endswith("Operations"):  # Skip operation headings
                     yield IndexEntry(
@@ -75,7 +80,12 @@ class EnhancedAPIReferenceParser:
                 section_name = section_name.replace("\n", " ").strip()
 
                 # Skip common navigation sections
-                skip_sections = {"Operations", "Read Operations", "Write Operations", "Patch Operations"}
+                skip_sections = {
+                    "Operations",
+                    "Read Operations",
+                    "Write Operations",
+                    "Patch Operations",
+                }
                 if section_name not in skip_sections:
                     yield IndexEntry(
                         name=section_name,
@@ -110,12 +120,21 @@ class EnhancedAPIReferenceParser:
                 # Look for pattern: fieldName (TypeName)
                 if field_name in full_text:
                     # Find the type in parentheses
-                    type_match = re.search(rf"{re.escape(field_name)}\s*\((.*?)\)", full_text)
+                    type_match = re.search(
+                        rf"{re.escape(field_name)}\s*\((.*?)\)", full_text
+                    )
                     if type_match:
                         type_name = type_match.group(1)
 
                         # Create entry for complex types
-                        if type_name and not type_name in ["string", "boolean", "int", "int32", "int64", "number"]:
+                        if type_name and type_name not in [
+                            "string",
+                            "boolean",
+                            "int",
+                            "int32",
+                            "int64",
+                            "number",
+                        ]:
                             # Strip array notation
                             clean_type = type_name.replace("[]", "").strip()
 
@@ -131,7 +150,9 @@ class EnhancedAPIReferenceParser:
 class EnhancedKubectlParser:
     """Enhanced parser for kubectl command reference pages."""
 
-    PATH_PATTERN = re.compile(r"docs/reference/(generated/)?kubectl/[\w-]+/index\.html$")
+    PATH_PATTERN = re.compile(
+        r"docs/reference/(generated/)?kubectl/[\w-]+/index\.html$"
+    )
 
     def matches(self, relative_path: str) -> bool:
         """Check if this parser should handle the given path."""
@@ -163,7 +184,9 @@ class EnhancedKubectlParser:
             heading_id = heading.get("id")
 
             # Look for command syntax patterns
-            if "kubectl" in heading_text.lower() or heading_text.startswith(("create", "delete", "get", "apply", "describe")):
+            if "kubectl" in heading_text.lower() or heading_text.startswith(
+                ("create", "delete", "get", "apply", "describe")
+            ):
                 yield IndexEntry(
                     name=heading_text,
                     entry_type="Command",
@@ -197,7 +220,10 @@ class CodeSampleParser:
             code_text = code.get_text()
 
             # Check if it looks like a Kubernetes manifest
-            if any(keyword in code_text for keyword in ["apiVersion:", "kind:", "metadata:", "spec:"]):
+            if any(
+                keyword in code_text
+                for keyword in ["apiVersion:", "kind:", "metadata:", "spec:"]
+            ):
                 # Try to find preceding heading for context
                 sample_name = None
                 prev = pre

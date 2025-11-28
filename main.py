@@ -99,10 +99,7 @@ Examples:
             print("=" * 60)
             print()
 
-            scrape_kubernetes_docs(
-                output_dir=args.cache_dir,
-                version=args.version
-            )
+            scrape_kubernetes_docs(output_dir=args.cache_dir, version=args.version)
 
             # Use the scraped content as source
             # Create a fake .docset structure with the scraped docs
@@ -114,13 +111,24 @@ Examples:
             resources_dir.mkdir(parents=True, exist_ok=True)
 
             # Move scraped docs into the docset structure
+            import shutil
+
+            # Copy docs directory into Resources/Documents
             docs_dir = args.cache_dir / "docs"
             if docs_dir.exists():
-                import shutil
-                # Copy docs directory into Resources/Documents
                 if (resources_dir / "docs").exists():
                     shutil.rmtree(resources_dir / "docs")
                 shutil.copytree(docs_dir, resources_dir / "docs")
+
+            # Copy static asset directories (CSS, JS, fonts, images, etc.)
+            asset_dirs = ["scss", "css", "js", "fonts", "icons", "images"]
+            for asset_dir in asset_dirs:
+                asset_source = args.cache_dir / asset_dir
+                if asset_source.exists():
+                    asset_dest = resources_dir / asset_dir
+                    if asset_dest.exists():
+                        shutil.rmtree(asset_dest)
+                    shutil.copytree(asset_source, asset_dest)
 
             print()
             print("=" * 60)
@@ -137,7 +145,10 @@ Examples:
                 return 1
 
             if not source.is_dir() or not source.suffix == ".docset":
-                print(f"Error: Source must be a .docset directory: {source}", file=sys.stderr)
+                print(
+                    f"Error: Source must be a .docset directory: {source}",
+                    file=sys.stderr,
+                )
                 return 1
 
         # Build the docset
@@ -154,15 +165,16 @@ Examples:
         print("=" * 60)
         print(f"\nDocset created at: {docset_path}")
         print("\nTo install in Dash:")
-        print(f"  1. Open Dash")
-        print(f"  2. Go to Preferences > Docsets")
+        print("  1. Open Dash")
+        print("  2. Go to Preferences > Docsets")
         print(f"  3. Click + and select '{docset_path}'")
-        print(f"\nOr double-click the .docset file to install it.")
+        print("\nOr double-click the .docset file to install it.")
         return 0
 
     except Exception as e:
         print(f"\nError: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
 

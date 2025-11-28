@@ -83,7 +83,6 @@ class APIResourceParser:
             )
 
             # Also add with version suffix for disambiguation
-            resource_name = match.group(1)
             version = match.group(2)
             versioned_name = f"{title} ({version})"
             if versioned_name != title:
@@ -310,7 +309,9 @@ class GlossaryParser:
 class ComponentParser:
     """Parser for Kubernetes component reference pages (kube-apiserver, kubelet, etc.)."""
 
-    PATH_PATTERN = re.compile(r"docs/reference/(?:command-line-tools-reference|generated)/(kube-[\w-]+|kubelet|etcd)/")
+    PATH_PATTERN = re.compile(
+        r"docs/reference/(?:command-line-tools-reference|generated)/(kube-[\w-]+|kubelet|etcd)/"
+    )
 
     def matches(self, relative_path: str) -> bool:
         """Check if this parser handles the given path."""
@@ -405,6 +406,7 @@ class DashAnchorParser:
 
                 # URL decode the name (e.g., %20 -> space)
                 from urllib.parse import unquote
+
                 entry_name = unquote(entry_name)
 
                 # Skip generic/noisy entries
@@ -484,7 +486,7 @@ except ImportError:
 # Then specific parsers add their own entries
 ALL_PARSERS = [
     DashAnchorParser(),  # Extract embedded anchors first (if present from Dash)
-    *ENHANCED_PARSERS,   # Enhanced parsers for raw HTML extraction
+    *ENHANCED_PARSERS,  # Enhanced parsers for raw HTML extraction
     APIResourceParser(),
     KubectlCommandParser(),
     ComponentParser(),
