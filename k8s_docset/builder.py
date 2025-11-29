@@ -1,12 +1,12 @@
 """Docset builder - creates the Dash docset structure and SQLite index."""
 
+import hashlib
+import re
 import shutil
 import sqlite3
 from io import BytesIO
 from pathlib import Path
 from typing import Iterator
-
-import re
 from urllib.parse import quote
 
 import requests
@@ -176,6 +176,25 @@ class DocsetBuilder:
 
                 # Insert anchor before the heading
                 heading.insert_before(anchor)
+
+            # Inject IDs on code samples (Kubernetes manifests) for Sample entries
+            # This matches the hash logic in CodeSampleParser
+            for pre in soup.find_all("pre"):
+                code = pre.find("code")
+                if not code:
+                    continue
+
+                code_text = code.get_text()
+
+                # Check if it looks like a Kubernetes manifest
+                if any(
+                    keyword in code_text
+                    for keyword in ["apiVersion:", "kind:", "metadata:", "spec:"]
+                ):
+                    # Generate the same anchor ID as CodeSampleParser (deterministic MD5)
+                    content_hash = hashlib.md5(code_text[:100].encode()).hexdigest()[:4]
+                    anchor_id = f"sample-{content_hash}"
+                    pre["id"] = anchor_id
 
             # Write modified HTML
             dest_file.write_text(str(soup), encoding="utf-8")

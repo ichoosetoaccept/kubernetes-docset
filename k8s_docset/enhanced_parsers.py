@@ -143,7 +143,7 @@ class EnhancedAPIReferenceParser:
                                 yield IndexEntry(
                                     name=field_name,
                                     entry_type="Property",
-                                    path=f"{relative_path}#{field_name}",
+                                    path=relative_path,  # No anchor - field IDs don't exist in HTML
                                 )
 
 
@@ -248,8 +248,10 @@ class CodeSampleParser:
                     else:
                         name = f"{kind} Example"
 
-                    # Create unique anchor based on position
-                    anchor = f"sample-{abs(hash(code_text[:100])) % 10000}"
+                    # Create unique anchor based on content (deterministic hash)
+                    import hashlib
+                    content_hash = hashlib.md5(code_text[:100].encode()).hexdigest()[:4]
+                    anchor = f"sample-{content_hash}"
 
                     yield IndexEntry(
                         name=name[:100],  # Limit length
