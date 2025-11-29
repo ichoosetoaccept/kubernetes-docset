@@ -32,3 +32,15 @@ sequence = ["scrape", "verify"]
 [tool.poe.tasks.rebuild]
 help = "Clean and rebuild from scratch"
 sequence = ["clean", "scrape", "verify"]
+
+[tool.poe.tasks.verify-contrib]
+help = "Verify docset meets Dash contribution requirements"
+cmd = "uv run verify_contribution.py -v"
+
+[tool.poe.tasks.contribute]
+help = "Prepare files for Dash contribution"
+cmd = "uv run contribute.py"
+
+[tool.poe.tasks.submit]
+help = "Prepare and submit PR to Dash-User-Contributions"
+cmd = "uv run contribute.py --submit"
