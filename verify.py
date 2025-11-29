@@ -308,6 +308,46 @@ class DocsetValidator:
         if not found_issues:
             self.success("No tracking/cookie scripts detected")
 
+        # Check for broken navigation links (file:/// or unscraped sections)
+        broken_link_patterns = [
+            (r'href="file:///', "file:// links"),
+            (r'href="/blog/', "links to /blog/ (not scraped)"),
+            (r'href="/training/', "links to /training/ (not scraped)"),
+            (r'href="/partners/', "links to /partners/ (not scraped)"),
+            (r'href="/community/', "links to /community/ (not scraped)"),
+        ]
+        broken_links: set[str] = set()
+        for html_file in sample_files[:5]:
+            try:
+                content = html_file.read_text(encoding="utf-8", errors="ignore")
+                for pattern, desc in broken_link_patterns:
+                    if re.search(pattern, content):
+                        broken_links.add(desc)
+            except OSError:
+                pass
+
+        for issue in broken_links:
+            self.warning(f"Found broken links: {issue}")
+
+        if not broken_links:
+            self.success("No broken navigation links detected")
+
+        # Check that navbar has been removed (causes broken links in offline docset)
+        navbar_found = False
+        for html_file in sample_files[:3]:
+            try:
+                content = html_file.read_text(encoding="utf-8", errors="ignore")
+                if re.search(r'<nav[^>]*class="[^"]*navbar[^"]*"', content):
+                    navbar_found = True
+                    break
+            except OSError:
+                pass
+
+        if navbar_found:
+            self.warning("Navbar elements found (should be removed for offline docset)")
+        else:
+            self.success("No navbar elements (clean offline display)")
+
     def _check_toc_anchors(self) -> None:
         """Check that TOC anchors are properly formed and targets exist."""
         print("\n📑 Checking TOC anchors...")
@@ -320,13 +360,26 @@ class DocsetValidator:
         sample_files = random.sample(html_files, sample_size)
 
         total_anchors = 0
-        anchor_pattern = re.compile(r'class="dashAnchor"[^>]*name="//apple_ref/cpp/(\w+)/([^"]+)"')
+        anchors_outside_headings = 0
 
         for html_file in sample_files:
             try:
                 content = html_file.read_text(encoding="utf-8", errors="ignore")
-                anchors = anchor_pattern.findall(content)
-                total_anchors += len(anchors)
+
+                # Count anchors
+                anchor_matches = re.findall(r'class="dashAnchor"', content)
+                total_anchors += len(anchor_matches)
+
+                # Check if anchors are inside headings (not before them)
+                # Good: <h2><a class="dashAnchor"...></a>Title</h2>
+                # Bad:  <a class="dashAnchor"...></a><h2>Title</h2>
+                # Match anchor tags with dashAnchor class followed by heading tags
+                bad_pattern = re.compile(
+                    r'<a\s[^>]*dashAnchor[^>]*>\s*</a>\s*<h[123]',
+                    re.IGNORECASE
+                )
+                bad_matches = bad_pattern.findall(content)
+                anchors_outside_headings += len(bad_matches)
             except OSError:
                 pass
 
@@ -334,6 +387,11 @@ class DocsetValidator:
             self.warning("No dashAnchor elements found in sampled files")
         else:
             self.success(f"Found {total_anchors} TOC anchors in {sample_size} sampled files")
+
+        if anchors_outside_headings > 0:
+            self.warning(
+                f"{anchors_outside_headings} anchors placed before headings (should be inside)"
+            )
 
         # Check search index entries have valid anchor targets
         if self.db_path.exists():

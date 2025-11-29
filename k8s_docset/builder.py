@@ -144,6 +144,10 @@ class DocsetBuilder:
 
             soup = BeautifulSoup(content, "lxml")
 
+            # Remove the top navigation bar (broken links in offline docset)
+            for navbar in soup.find_all("nav", class_=lambda c: c and "navbar" in c):
+                navbar.decompose()
+
             # Find all headings with IDs (h1, h2, h3)
             for heading in soup.find_all(["h1", "h2", "h3"], id=True):
                 heading_id = heading.get("id")
@@ -174,8 +178,18 @@ class DocsetBuilder:
                 anchor["name"] = f"//apple_ref/cpp/{entry_type}/{encoded_name}"
                 anchor["class"] = "dashAnchor"
 
-                # Insert anchor before the heading
-                heading.insert_before(anchor)
+                # Insert anchor inside the heading (at the start) so the heading isn't cut off
+                heading.insert(0, anchor)
+
+            # Inject CSS to fix scroll margin when navigating via TOC
+            style_tag = soup.new_tag("style")
+            style_tag.string = """
+                h1:has(.dashAnchor), h2:has(.dashAnchor), h3:has(.dashAnchor) {
+                    scroll-margin-top: 80px !important;
+                }
+            """
+            if soup.head:
+                soup.head.append(style_tag)
 
             # Inject IDs on code samples (Kubernetes manifests) for Sample entries
             # This matches the hash logic in CodeSampleParser
@@ -196,8 +210,42 @@ class DocsetBuilder:
                     anchor_id = f"sample-{content_hash}"
                     pre["id"] = anchor_id
 
+            # Serialize HTML
+            final_content = str(soup)
+
+            # Calculate prefix for relative paths
+            try:
+                relative_to_docs = dest_file.relative_to(self.documents_dir)
+                depth = len(relative_to_docs.parts) - 1
+            except ValueError:
+                depth = 0
+            prefix = "../" * depth
+
+            # Fix absolute /docs/ links to be relative (must be after BeautifulSoup)
+            final_content = re.sub(
+                r'href="/docs/([^"]*)"',
+                rf'href="{prefix}docs/\1"',
+                final_content,
+            )
+
+            # Neutralize links to sections we didn't scrape (must be after BeautifulSoup)
+            unscraped_sections = [
+                "/blog/", "/training/", "/partners/", "/community/",
+                "/case-studies/", "/careers/", "/releases",
+                # Language versions we didn't scrape
+                "/zh-cn/", "/bn/", "/fr/", "/de/", "/hi/", "/id/", "/it/",
+                "/ja/", "/ko/", "/pl/", "/pt-br/", "/ru/", "/es/", "/uk/", "/vi/",
+            ]
+            for section in unscraped_sections:
+                # Remove the entire link element for cleaner display
+                final_content = re.sub(
+                    rf'<a[^>]*href="{re.escape(section)}[^"]*"[^>]*>([^<]*)</a>',
+                    r'<span style="opacity:0.3">\1</span>',
+                    final_content,
+                )
+
             # Write modified HTML
-            dest_file.write_text(str(soup), encoding="utf-8")
+            dest_file.write_text(final_content, encoding="utf-8")
 
         except Exception:
             # If processing fails, just copy the file as-is
@@ -221,6 +269,18 @@ class DocsetBuilder:
             depth = 0
 
         prefix = "../" * depth
+
+        # Fix absolute /docs/ links to be relative
+        content = re.sub(
+            r'href="/docs/([^"]*)"',
+            rf'href="{prefix}docs/\1"',
+            content,
+        )
+        content = re.sub(
+            r"href='/docs/([^']*)'",
+            rf"href='{prefix}docs/\1'",
+            content,
+        )
 
         # Asset directories that should have paths fixed
         asset_dirs = ["scss", "css", "js", "fonts", "icons", "images"]

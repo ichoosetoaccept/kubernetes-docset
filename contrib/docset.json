@@ -1,6 +1,6 @@
 {
     "name": "Kubernetes",
-    "version": "1.34",
+    "version": "1.34/fix1",
     "archive": "Kubernetes.tgz",
     "author": {
         "name": "Ismar Iljazovic",
