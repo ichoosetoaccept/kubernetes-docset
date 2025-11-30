@@ -15,6 +15,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "prek>=0.0.10",
+    "pytest>=9.0.1",
     "ty>=0.0.1a29",
 ]
 
@@ -24,6 +25,7 @@ build = "uv run main.py --source .cache/kubernetes-docs/Kubernetes.docset"
 verify = "uv run verify.py -v"
 clean = { shell = "rm -rf output/ .cache/" }
 check = "uv run ty check"
+test = "uv run pytest tests/ -v"
 
 [tool.poe.tasks.all]
 help = "Scrape, build, and verify the docset"
