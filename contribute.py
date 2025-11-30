@@ -146,10 +146,15 @@ def update_pr(
     """
     # Fetch and checkout existing branch
     subprocess.run(["git", "fetch", "origin"], cwd=contrib_repo, check=True)
-
-    # Reset any local changes first
     subprocess.run(
-        ["git", "checkout", "--", "."],
+        ["git", "checkout", branch_name],
+        cwd=contrib_repo,
+        check=True,
+    )
+
+    # Reset any local changes on this branch (from previous prepare attempts)
+    subprocess.run(
+        ["git", "checkout", "--", f"docsets/{docset_name}"],
         cwd=contrib_repo,
         capture_output=True,
     )
@@ -157,12 +162,6 @@ def update_pr(
         ["git", "clean", "-fd", f"docsets/{docset_name}"],
         cwd=contrib_repo,
         capture_output=True,
-    )
-
-    subprocess.run(
-        ["git", "checkout", branch_name],
-        cwd=contrib_repo,
-        check=True,
     )
 
     # Now prepare files on this branch
