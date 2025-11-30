@@ -132,6 +132,60 @@ def submit_pr(contrib_repo: Path, docset_name: str, version: str) -> None:
     )
 
 
+def update_pr(
+    contrib_repo: Path,
+    docset_name: str,
+    branch_name: str,
+    version: str,
+    docset_path: Path,
+) -> None:
+    """Update an existing PR branch with new files.
+
+    Note: This should be called BEFORE prepare_contribution, as it will
+    checkout the branch first, then prepare files on that branch.
+    """
+    # Fetch and checkout existing branch
+    subprocess.run(["git", "fetch", "origin"], cwd=contrib_repo, check=True)
+
+    # Reset any local changes first
+    subprocess.run(
+        ["git", "checkout", "--", "."],
+        cwd=contrib_repo,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "clean", "-fd", f"docsets/{docset_name}"],
+        cwd=contrib_repo,
+        capture_output=True,
+    )
+
+    subprocess.run(
+        ["git", "checkout", branch_name],
+        cwd=contrib_repo,
+        check=True,
+    )
+
+    # Now prepare files on this branch
+    prepare_contribution(docset_path, contrib_repo, docset_name, version)
+
+    # Add and commit
+    subprocess.run(["git", "add", f"docsets/{docset_name}"], cwd=contrib_repo, check=True)
+    result = subprocess.run(
+        ["git", "commit", "--amend", "-m", f"Update {docset_name} docset to {version}"],
+        cwd=contrib_repo,
+    )
+    if result.returncode != 0:
+        # No changes to amend, try regular commit
+        subprocess.run(
+            ["git", "commit", "-m", f"Update {docset_name} docset to {version}"],
+            cwd=contrib_repo,
+            check=True,
+        )
+
+    # Force push to update PR
+    subprocess.run(["git", "push", "--force-with-lease"], cwd=contrib_repo, check=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Prepare Dash docset contribution")
     parser.add_argument(
@@ -161,6 +215,12 @@ def main() -> int:
         action="store_true",
         help="Also create and submit a PR",
     )
+    parser.add_argument(
+        "--update",
+        type=str,
+        metavar="BRANCH",
+        help="Update existing PR branch instead of creating new one",
+    )
 
     args = parser.parse_args()
 
@@ -173,6 +233,19 @@ def main() -> int:
         print(f"Error: Dash-User-Contributions repo not found at {args.contrib_repo}")
         print("Clone it first: git clone https://github.com/Kapeli/Dash-User-Contributions.git")
         return 1
+
+    if args.update:
+        # Update handles prepare internally (needs to checkout branch first)
+        print(f"Updating existing PR branch: {args.update}")
+        update_pr(
+            args.contrib_repo,
+            args.name,
+            args.update,
+            args.version,
+            args.docset,
+        )
+        print("\nPR updated!")
+        return 0
 
     print(f"Preparing {args.name} docset contribution...")
     docset_dir = prepare_contribution(
