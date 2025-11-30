@@ -128,11 +128,42 @@ class DocsetBuilder:
                 html_count += 1
                 if html_count % 200 == 0:
                     print(f"  Processed {html_count} HTML files...")
+            elif source_file.suffix == ".css":
+                # Process CSS files to remove external font imports
+                self._copy_css_without_external_fonts(source_file, dest_file)
             else:
                 # Copy other files directly
                 shutil.copy2(source_file, dest_file)
 
         print(f"  Processed {html_count} HTML files with TOC injection")
+
+    def _copy_css_without_external_fonts(
+        self, source_file: Path, dest_file: Path
+    ) -> None:
+        """Copy a CSS file, removing external font @import statements."""
+        try:
+            content = source_file.read_text(encoding="utf-8", errors="replace")
+
+            # Remove @import statements for external fonts
+            # Matches: @import "https://fonts.googleapis.com/...";
+            # Matches: @import "https://cdn.jsdelivr.net/...";
+            content = re.sub(
+                r'@import\s+["\']https?://[^"\']+["\'];?\s*',
+                "",
+                content,
+            )
+
+            # Also remove url() references to external fonts in @font-face
+            content = re.sub(
+                r'url\(["\']?https?://fonts\.[^)]+\)',
+                'url("")',
+                content,
+            )
+
+            dest_file.write_text(content, encoding="utf-8")
+        except Exception:
+            # If processing fails, just copy the file as-is
+            shutil.copy2(source_file, dest_file)
 
     def _copy_html_with_toc(self, source_file: Path, dest_file: Path) -> None:
         """Copy an HTML file, injecting dashAnchor elements for TOC support."""

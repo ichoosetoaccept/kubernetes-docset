@@ -61,6 +61,7 @@ class DocsetValidator:
         self._check_icons()
         self._check_search_index()
         self._check_assets()
+        self._check_external_fonts()
         self._check_html_content()
         self._check_toc_anchors()
 
@@ -241,6 +242,46 @@ class DocsetValidator:
 
         if found_assets == 0:
             self.error("No asset directories found - CSS/JS won't work")
+
+    def _check_external_fonts(self) -> None:
+        """Check CSS files for external font imports that break offline viewing."""
+        print("\n🔤 Checking for external font imports...")
+
+        css_files = list(self.documents_dir.rglob("*.css"))
+        if not css_files:
+            self.warning("No CSS files found")
+            return
+
+        # Patterns for external font imports
+        external_font_patterns = [
+            (re.compile(r'@import\s+["\']https?://fonts\.googleapis\.com'), "Google Fonts @import"),
+            (re.compile(r'@import\s+["\']https?://cdn\.jsdelivr\.net'), "jsDelivr @import"),
+            (re.compile(r'url\(["\']?https?://fonts\.googleapis\.com'), "Google Fonts url()"),
+            (re.compile(r'url\(["\']?https?://fonts\.gstatic\.com'), "Google Fonts static url()"),
+        ]
+
+        files_with_external_fonts = []
+
+        for css_file in css_files:
+            try:
+                content = css_file.read_text(encoding="utf-8", errors="ignore")
+                for pattern, desc in external_font_patterns:
+                    if pattern.search(content):
+                        rel_path = css_file.relative_to(self.documents_dir)
+                        files_with_external_fonts.append((rel_path, desc))
+                        break  # Only report once per file
+            except OSError:
+                pass
+
+        if files_with_external_fonts:
+            self.error(f"Found {len(files_with_external_fonts)} CSS file(s) with external font imports")
+            for rel_path, desc in files_with_external_fonts[:5]:  # Show first 5
+                if self.verbose:
+                    self.warning(f"  {rel_path}: {desc}")
+            if len(files_with_external_fonts) > 5:
+                self.warning(f"  ... and {len(files_with_external_fonts) - 5} more")
+        else:
+            self.success("No external font imports found (good for offline viewing)")
 
     def _check_html_content(self) -> None:
         """Check HTML files for unwanted content (tracking, cookies, etc.)."""
