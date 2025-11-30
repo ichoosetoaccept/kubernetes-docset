@@ -282,6 +282,27 @@ class DocsetValidator:
         else:
             self.success("No absolute asset paths found in sampled HTML files")
 
+        # Check for absolute /docs/ paths (should be relative)
+        docs_path_pattern = re.compile(r'(href|src)="/docs/')
+        files_with_docs_absolute = 0
+        for html_file in sample_files:
+            try:
+                content = html_file.read_text(encoding="utf-8", errors="ignore")
+                if docs_path_pattern.search(content):
+                    files_with_docs_absolute += 1
+                    if self.verbose:
+                        rel_path = html_file.relative_to(self.documents_dir)
+                        self.warning(f"Absolute /docs/ path in: {rel_path}")
+            except OSError:
+                pass
+
+        if files_with_docs_absolute > 0:
+            self.error(
+                f"{files_with_docs_absolute}/{sample_size} files have absolute /docs/ paths"
+            )
+        else:
+            self.success("No absolute /docs/ paths (all relative)")
+
         # Patterns that indicate unwanted content
         unwanted_patterns = [
             (r"googletagmanager\.com", "Google Tag Manager"),

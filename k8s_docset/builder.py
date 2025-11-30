@@ -221,10 +221,16 @@ class DocsetBuilder:
                 depth = 0
             prefix = "../" * depth
 
-            # Fix absolute /docs/ links to be relative (must be after BeautifulSoup)
+            # Fix absolute /docs/ paths to be relative (must be after BeautifulSoup)
+            # Handle both href and src attributes
             final_content = re.sub(
                 r'href="/docs/([^"]*)"',
                 rf'href="{prefix}docs/\1"',
+                final_content,
+            )
+            final_content = re.sub(
+                r'src="/docs/([^"]*)"',
+                rf'src="{prefix}docs/\1"',
                 final_content,
             )
 
