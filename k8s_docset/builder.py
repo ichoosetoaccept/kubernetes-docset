@@ -76,6 +76,9 @@ class DocsetBuilder:
         # Copy HTML files
         self._copy_documents()
 
+        # Download vendor assets (KaTeX for math rendering)
+        self._download_vendor_assets()
+
         # Create Info.plist
         self._create_info_plist()
 
@@ -136,6 +139,93 @@ class DocsetBuilder:
                 shutil.copy2(source_file, dest_file)
 
         print(f"  Processed {html_count} HTML files with TOC injection")
+
+    def _download_vendor_assets(self) -> None:
+        """Download vendor assets like KaTeX for offline use."""
+        print("Downloading vendor assets...")
+
+        # KaTeX version used by Kubernetes docs
+        katex_version = "0.16.3"
+        katex_base = f"https://cdn.jsdelivr.net/npm/katex@{katex_version}/dist"
+
+        # Files needed for KaTeX
+        katex_files = [
+            "katex.min.js",
+            "katex.min.css",
+            "contrib/auto-render.min.js",
+            # Fonts
+            "fonts/KaTeX_Main-Regular.woff2",
+            "fonts/KaTeX_Main-Bold.woff2",
+            "fonts/KaTeX_Main-Italic.woff2",
+            "fonts/KaTeX_Math-Italic.woff2",
+            "fonts/KaTeX_Math-BoldItalic.woff2",
+            "fonts/KaTeX_Size1-Regular.woff2",
+            "fonts/KaTeX_Size2-Regular.woff2",
+            "fonts/KaTeX_Size3-Regular.woff2",
+            "fonts/KaTeX_Size4-Regular.woff2",
+            "fonts/KaTeX_AMS-Regular.woff2",
+            "fonts/KaTeX_Caligraphic-Regular.woff2",
+            "fonts/KaTeX_Caligraphic-Bold.woff2",
+            "fonts/KaTeX_Fraktur-Regular.woff2",
+            "fonts/KaTeX_Fraktur-Bold.woff2",
+            "fonts/KaTeX_SansSerif-Regular.woff2",
+            "fonts/KaTeX_SansSerif-Bold.woff2",
+            "fonts/KaTeX_SansSerif-Italic.woff2",
+            "fonts/KaTeX_Script-Regular.woff2",
+            "fonts/KaTeX_Typewriter-Regular.woff2",
+        ]
+
+        # Create vendor/katex directory
+        katex_dir = self.documents_dir / "vendor" / "katex"
+        katex_dir.mkdir(parents=True, exist_ok=True)
+        (katex_dir / "contrib").mkdir(exist_ok=True)
+        (katex_dir / "fonts").mkdir(exist_ok=True)
+
+        downloaded = 0
+        for file_path in katex_files:
+            url = f"{katex_base}/{file_path}"
+            dest = katex_dir / file_path
+
+            if dest.exists():
+                downloaded += 1
+                continue
+
+            try:
+                response = requests.get(url, timeout=30)
+                response.raise_for_status()
+                dest.write_bytes(response.content)
+                downloaded += 1
+            except Exception as e:
+                print(f"  Warning: Failed to download {file_path}: {e}")
+
+        print(f"  Downloaded {downloaded}/{len(katex_files)} KaTeX files")
+
+        # Mermaid version used by Kubernetes docs (for diagrams)
+        mermaid_version = "9.2.2"
+        mermaid_base = f"https://cdn.jsdelivr.net/npm/mermaid@{mermaid_version}/dist"
+        mermaid_files = ["mermaid.min.js"]
+
+        mermaid_dir = self.documents_dir / "vendor" / "mermaid"
+        mermaid_dir.mkdir(parents=True, exist_ok=True)
+
+        downloaded = 0
+        for file_path in mermaid_files:
+            url = f"{mermaid_base}/{file_path}"
+            dest = mermaid_dir / file_path
+
+            if dest.exists():
+                downloaded += 1
+                continue
+
+            try:
+                response = requests.get(url, timeout=30)
+                response.raise_for_status()
+                dest.write_bytes(response.content)
+                downloaded += 1
+            except Exception as e:
+                print(f"  Warning: Failed to download {file_path}: {e}")
+
+        print(f"  Downloaded {downloaded}/{len(mermaid_files)} Mermaid files")
 
     def _copy_css_without_external_fonts(
         self, source_file: Path, dest_file: Path
@@ -369,6 +459,22 @@ class DocsetBuilder:
             "",
             content,
             flags=re.DOTALL | re.IGNORECASE,
+        )
+
+        # Rewrite KaTeX CDN URLs to local paths (handle newlines in attributes)
+        content = re.sub(
+            r'(src|href)="\s*https://cdn\.jsdelivr\.net/npm/katex@[\d.]+/dist/([^"]+)"',
+            rf'\1="{prefix}vendor/katex/\2"',
+            content,
+            flags=re.DOTALL,
+        )
+
+        # Rewrite Mermaid CDN URLs to local paths
+        content = re.sub(
+            r'(src)="\s*https://cdn\.jsdelivr\.net/npm/mermaid@[\d.]+/dist/([^"]+)"',
+            rf'\1="{prefix}vendor/mermaid/\2"',
+            content,
+            flags=re.DOTALL,
         )
 
         return content

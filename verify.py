@@ -62,6 +62,7 @@ class DocsetValidator:
         self._check_search_index()
         self._check_assets()
         self._check_external_fonts()
+        self._check_external_cdn_scripts()
         self._check_html_content()
         self._check_toc_anchors()
 
@@ -282,6 +283,55 @@ class DocsetValidator:
                 self.warning(f"  ... and {len(files_with_external_fonts) - 5} more")
         else:
             self.success("No external font imports found (good for offline viewing)")
+
+    def _check_external_cdn_scripts(self) -> None:
+        """Check HTML files for external CDN scripts that break offline viewing."""
+        print("\n📦 Checking for external CDN scripts...")
+
+        html_files = list(self.documents_dir.rglob("*.html"))
+        if not html_files:
+            return
+
+        # Check if we have local vendor assets (KaTeX, etc.)
+        vendor_dir = self.documents_dir / "vendor"
+        has_local_katex = (vendor_dir / "katex" / "katex.min.js").exists()
+        if has_local_katex:
+            self.success("Found local KaTeX vendor assets")
+
+        # Sample some files
+        sample_size = min(50, len(html_files))
+        sample_files = random.sample(html_files, sample_size)
+
+        # Patterns for external CDN scripts (exclude if rewritten to local)
+        external_cdn_patterns = [
+            (re.compile(r'<script[^>]*https://cdn\.jsdelivr\.net[^>]*>', re.IGNORECASE), "jsDelivr script"),
+            (re.compile(r'<script[^>]*https://cdnjs\.cloudflare\.com[^>]*>', re.IGNORECASE), "cdnjs script"),
+            (re.compile(r'<script[^>]*https://unpkg\.com[^>]*>', re.IGNORECASE), "unpkg script"),
+            (re.compile(r'<link[^>]*https://cdn\.jsdelivr\.net[^>]*>', re.IGNORECASE), "jsDelivr CSS"),
+        ]
+
+        files_with_external_cdn = []
+
+        for html_file in sample_files:
+            try:
+                content = html_file.read_text(encoding="utf-8", errors="ignore")
+                for pattern, desc in external_cdn_patterns:
+                    if pattern.search(content):
+                        rel_path = html_file.relative_to(self.documents_dir)
+                        files_with_external_cdn.append((rel_path, desc))
+                        break  # Only report once per file
+            except OSError:
+                pass
+
+        if files_with_external_cdn:
+            self.error(f"Found {len(files_with_external_cdn)} HTML file(s) with external CDN scripts")
+            for rel_path, desc in files_with_external_cdn[:5]:
+                if self.verbose:
+                    self.warning(f"  {rel_path}: {desc}")
+            if len(files_with_external_cdn) > 5:
+                self.warning(f"  ... and {len(files_with_external_cdn) - 5} more")
+        else:
+            self.success("No external CDN scripts found (good for offline viewing)")
 
     def _check_html_content(self) -> None:
         """Check HTML files for unwanted content (tracking, cookies, etc.)."""
